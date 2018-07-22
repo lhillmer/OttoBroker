@@ -29,10 +29,16 @@ DISPLAYNAME_KEY = 'displayname'
 AMOUNT_KEY = 'amount'
 REASON_KEY = 'reason'
 QUANTITY_KEY = 'quantity'
+SHALLOW_KEY = 'shallow'
+HISTORICAL_KEY = 'historical'
 
 # error messages
 MISSING_PARAM_MSG = 'missing required parameter: {param}'
 INVALID_TYPE_MSG = 'param \'{param}\' could not be converted to type \'{type}\''
+
+# bool conversion consts
+STR_TRUE = 'True'
+STR_FALSE = 'False'
 
 
 # END CONSTANTS
@@ -91,7 +97,47 @@ if __name__ == '__main__':
         if USERID_KEY not in request.args:
             return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=USERID_KEY)))
 
-        return jsonify(broker.get_user_info(request.args[USERID_KEY]))
+        if SHALLOW_KEY not in request.args:
+            shallow = False
+        else:
+            shallow = request.args[SHALLOW_KEY]
+            if shallow.lower() == STR_TRUE.lower():
+                shallow = True
+            elif shallow.lower() == STR_FALSE.lower():
+                shallow = False
+
+        if HISTORICAL_KEY not in request.args:
+            historical = False
+        else:
+            historical = request.args[HISTORICAL_KEY]
+            if historical.lower() == STR_TRUE.lower():
+                historical = True
+            elif historical.lower() == STR_FALSE.lower():
+                historical = False
+            
+        return jsonify(broker.get_user_info(request.args[USERID_KEY], shallow, historical))
+    
+    @app.route('/broker/all_users')
+    def get_all_users():
+        if SHALLOW_KEY not in request.args:
+            shallow = False
+        else:
+            shallow = request.args[SHALLOW_KEY]
+            if shallow.lower() == STR_TRUE.lower():
+                shallow = True
+            elif shallow.lower() == STR_FALSE.lower():
+                shallow = False
+
+        if HISTORICAL_KEY not in request.args:
+            historical = False
+        else:
+            historical = request.args[HISTORICAL_KEY]
+            if historical.lower() == STR_TRUE.lower():
+                historical = True
+            elif historical.lower() == STR_FALSE.lower():
+                historical = False
+            
+        return jsonify(broker.get_all_users(shallow, historical))
     
     @app.route('/broker/register')
     def register_user():

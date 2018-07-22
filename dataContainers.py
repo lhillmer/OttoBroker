@@ -11,20 +11,29 @@ class BrokerUser():
         self.display_name = raw[2]
         self.balance = raw[3]
         self.stocks = dict()
+        self.historical_stocks = dict()
     
-    def to_dict(self):
+    def to_dict(self, shallow=False, historical=False):
         result = {
             'id': self.id,
             'created_date': self.created,
             'balance': self.balance,
             'display_name': self.display_name
         }
-
-        stock_dict = {}
-        for symbol in self.stocks:
-            stock_dict[symbol] = [x.to_dict() for x in self.stocks[symbol]]
         
-        result['stocks'] = stock_dict
+        if not shallow:
+            stock_dict = {}
+            for symbol in self.stocks:
+                stock_dict[symbol] = [x.to_dict() for x in self.stocks[symbol]]
+
+            result['stocks'] = stock_dict
+
+            if historical:
+                historical_stock_dict = {}
+                for symbol in self.historical_stocks:
+                    historical_stock_dict[symbol] = [x.to_dict() for x in self.historical_stocks[symbol]]
+
+                result['historical'] = historical_stock_dict
         
         return result
 

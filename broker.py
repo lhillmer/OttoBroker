@@ -64,6 +64,18 @@ class OttoBroker():
                 stock_dict[stock.ticker_symbol] = [stock]
 
         user.stocks = stock_dict
+
+        historical_stock_list = self._db.broker_get_historical_stocks_by_user(user_id)
+        
+        # create a dictionary of the stocks, grouped by ticker
+        stock_dict = {}
+        for stock in historical_stock_list:
+            if stock.ticker_symbol in stock_dict:
+                stock_dict[stock.ticker_symbol].append(stock)
+            else:
+                stock_dict[stock.ticker_symbol] = [stock]
+
+        user.historical_stocks = stock_dict
         
         self._user_cache[user.id] = user
 
@@ -295,16 +307,40 @@ class OttoBroker():
             'user': user.to_dict()
         }
 
-    def get_user_info(self, user_id):
+    def get_user_info(self, user_id, shallow, historical):
         user = self._get_user(user_id)
+
+        if not isinstance(shallow, bool):
+            return self.return_failure('shallow must be either \'True\' or \'False\'', do_log=False)
+
+        if not isinstance(historical, bool):
+            return self.return_failure('historical must be either \'True\' or \'False\'', do_log=False)
 
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
 
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict()
+            'user': user.to_dict(shallow, historical)
         }
+    
+    def get_all_users(self, shallow, historical):
+        if not isinstance(shallow, bool):
+            return self.return_failure('shallow must be either \'True\' or \'False\'', do_log=False)
+
+        if not isinstance(historical, bool):
+            return self.return_failure('historical must be either \'True\' or \'False\'', do_log=False)
+
+        result = {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user_list': []
+        }
+
+        for u in self._user_cache:
+            result['user_list'].append(self._user_cache[u].to_dict(shallow, historical))
+
+        return result
+
 
     def register_user(self, user_id, display_name, api_key):
         user = self._get_user(user_id)

@@ -72,6 +72,13 @@ class PostgresWrapper():
             result.append(BrokerStock(raw))
         return result
     
+    def broker_get_historical_stocks_by_user(self, user_id):
+        rawVals = self._query_wrapper("SELECT * FROM ottobroker.fakestocks WHERE userid=%s and sold is not NULL;", [user_id])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerStock(raw))
+        return result
+    
     def broker_give_money_to_user(self, user_id, amount, reason, api_key):
         result_table =  self._query_wrapper("SELECT ottobroker.givemoney(%s, %s, %s, %s);", [user_id, amount, reason, api_key])
         return result_table[0][0]
