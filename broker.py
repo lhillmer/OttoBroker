@@ -197,7 +197,7 @@ class OttoBroker():
             return self.return_failure('Insufficient funds', extra_vals=extra_vals, do_log=False)
         
         if self._db.broker_buy_regular_stock(user.id, symbol, per_stock_cost, quantity, api_key) is None:
-            return self.return_failure('DB update failed. Please check the logs...')
+            return self.return_failure('buying stocks failed. Ensure you have a valid API key')
         
         self._update_single_user(user.id)
         user = self._get_user(user.id)
@@ -243,7 +243,7 @@ class OttoBroker():
             return self.return_failure('Insufficient stocks', extra_vals=extra_vals, do_log=False)
         
         if self._db.broker_sell_regular_stock(user.id, symbol, per_stock_cost, quantity, api_key) is None:
-            return self.return_failure('DB update failed. Please check the logs...')
+            return self.return_failure('selling stocks failed. Ensure you have a valid API key')
         
         self._update_single_user(user.id)
         user = self._get_user(user.id)
@@ -264,7 +264,9 @@ class OttoBroker():
         if user.balance < amount:
             return self.return_failure('Insufficient cash to withdraw', do_log=False, extra_vals={'user': user.to_dict()})
 
-        self._db.broker_give_money_to_user(user.id, -amount, reason, api_key)
+        if self._db.broker_give_money_to_user(user.id, -amount, reason, api_key) is None:
+            return self.return_failure('withdraw failed. Ensure you have a valid API key')
+
         self._update_single_user(user.id)
         user = self._get_user(user.id)
 
@@ -282,7 +284,9 @@ class OttoBroker():
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
 
-        self._db.broker_give_money_to_user(user.id, amount, reason, api_key)
+        if self._db.broker_give_money_to_user(user.id, amount, reason, api_key) is None:
+            return self.return_failure('deposit failed. Ensure you have a valid API key')
+
         self._update_single_user(user.id)
         user = self._get_user(user.id)
 
@@ -308,7 +312,9 @@ class OttoBroker():
         if user is not None:
             return self.return_failure('User with id {} already exists'.format(user.id), do_log=False)
         
-        self._db.broker_create_user(user_id, display_name, api_key)
+        if self._db.broker_create_user(user_id, display_name, api_key) is None:
+            return self.return_failure('User could not be created. Ensure you have a valid API key')
+
         self._update_single_user(user_id)
         new_user = self._get_user(user_id)
         return {

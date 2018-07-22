@@ -45,7 +45,8 @@ class PostgresWrapper():
                 retry = False
 
     def broker_create_user(self, user_id, display_name, api_key):
-        return self._query_wrapper("SELECT ottobroker.createuser(%s, %s, %s);", [user_id, display_name, api_key])
+        result_table = self._query_wrapper("SELECT ottobroker.createuser(%s, %s, %s);", [user_id, display_name, api_key])
+        return result_table[0][0]
     
     def broker_get_single_user(self, user_id):
         return BrokerUser(self._query_wrapper("SELECT * FROM ottobroker.users WHERE id=%s;", [user_id])[0])
@@ -72,10 +73,13 @@ class PostgresWrapper():
         return result
     
     def broker_give_money_to_user(self, user_id, amount, reason, api_key):
-        return self._query_wrapper("SELECT ottobroker.givemoney(%s, %s, %s, %s);", [user_id, amount, reason, api_key])
+        result_table =  self._query_wrapper("SELECT ottobroker.givemoney(%s, %s, %s, %s);", [user_id, amount, reason, api_key])
+        return result_table[0][0]
     
     def broker_buy_regular_stock(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
-        return self._query_wrapper("SELECT ottobroker.buyregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+        result_table =  self._query_wrapper("SELECT ottobroker.buyregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+        return result_table[0][0]
     
     def broker_sell_regular_stock(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
-        return self._query_wrapper("SELECT ottobroker.sellregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+        result_table = self._query_wrapper("SELECT ottobroker.sellregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+        return result_table[0][0]
