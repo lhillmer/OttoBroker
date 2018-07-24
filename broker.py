@@ -201,9 +201,10 @@ class OttoBroker():
 
         if user.balance < total_cost:
             extra_vals = {
-                'per_stock_cost': per_stock_cost,
-                'total_cost': total_cost,
+                'per_stock_amt': per_stock_cost,
+                'total_amt': total_cost,
                 'quantity': quantity,
+                'symbol': symbol,
                 'user': user.to_dict()
             }
             return self.return_failure('Insufficient funds', extra_vals=extra_vals, do_log=False)
@@ -215,7 +216,11 @@ class OttoBroker():
         user = self._get_user(user.id)
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'total_amt': total_cost,
+            'per_stock_amt': per_stock_cost,
+            'quantity': quantity,
+            'symbol': symbol
         }
     
     def sell_stock(self, symbol, quantity, user_id, api_key):
@@ -250,6 +255,7 @@ class OttoBroker():
         if cur_stocks < total_cost:
             extra_vals = {
                 'quantity': quantity,
+                'symbol': symbol,
                 'user': user.to_dict()
             }
             return self.return_failure('Insufficient stocks', extra_vals=extra_vals, do_log=False)
@@ -261,7 +267,11 @@ class OttoBroker():
         user = self._get_user(user.id)
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'total_amt': total_cost,
+            'per_stock_amt': per_stock_cost,
+            'quantity': quantity,
+            'symbol': symbol
         }
     
     def withdraw(self, user_id, amount, reason, api_key):
@@ -284,7 +294,8 @@ class OttoBroker():
 
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'amount': amount,
         }
 
     def deposit(self, user_id, amount, reason, api_key):
@@ -355,7 +366,7 @@ class OttoBroker():
         new_user = self._get_user(user_id)
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': new_user.to_dict()
+            'user': new_user.to_dict(shallow=False, historical=True)
         }
 
     def toggle_test_mode(self, api_key):

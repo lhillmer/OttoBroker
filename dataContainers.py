@@ -21,19 +21,21 @@ class BrokerUser():
             'display_name': self.display_name
         }
         
+        stock_dict = {}
+        historical_stock_dict = {}
+        
         if not shallow:
             stock_dict = {}
             for symbol in self.stocks:
                 stock_dict[symbol] = [x.to_dict() for x in self.stocks[symbol]]
-
-            result['stocks'] = stock_dict
 
             if historical:
                 historical_stock_dict = {}
                 for symbol in self.historical_stocks:
                     historical_stock_dict[symbol] = [x.to_dict() for x in self.historical_stocks[symbol]]
 
-                result['historical'] = historical_stock_dict
+        result['historical'] = historical_stock_dict
+        result['stocks'] = stock_dict
         
         return result
 

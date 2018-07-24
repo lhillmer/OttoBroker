@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, Response
 
 import argparse
 import configparser
@@ -44,7 +44,7 @@ STR_FALSE = 'False'
 # END CONSTANTS
 
 def jsonify(obj):
-    return json.dumps(obj, cls=CustomJSONEncoder)
+    return Response(json.dumps(obj, cls=CustomJSONEncoder), mimetype='application/json')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -85,12 +85,19 @@ if __name__ == '__main__':
             return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=SYMBOLS_KEY)))
         return jsonify(broker.get_stock_value([s.upper() for s in request.args[SYMBOLS_KEY].split(',')]))
     
-    @app.route('/broker/toggle_test')
+    @app.route('/broker/toggle_test_mode')
     def toggle_test():
         if APIKEY_KEY not in request.args:
             return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=APIKEY_KEY)))
 
         return jsonify(broker.toggle_test_mode(request.args[APIKEY_KEY]))
+    
+    @app.route('/broker/test_mode')
+    def view_test():
+        return jsonify({
+            broker.STATUS_KEY: broker.STATUS_SUCCESS,
+            'test_mode': broker._test_mode
+        })
     
     @app.route('/broker/user_info')
     def get_user_info():
@@ -209,7 +216,7 @@ if __name__ == '__main__':
         except Exception:
             return jsonify(broker.return_failure(INVALID_TYPE_MSG.format(param=QUANTITY_KEY, type='int')))
 
-        return jsonify(broker.buy_stock(request.args[SYMBOL_KEY], quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
+        return jsonify(broker.buy_stock(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
     
     @app.route('/broker/sell_stock')
     def sell_stock():
@@ -230,7 +237,7 @@ if __name__ == '__main__':
         except Exception:
             return jsonify(broker.return_failure(INVALID_TYPE_MSG.format(param=QUANTITY_KEY, type='int')))
 
-        return jsonify(broker.sell_stock(request.args[SYMBOL_KEY], quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
+        return jsonify(broker.sell_stock(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
     
 
 

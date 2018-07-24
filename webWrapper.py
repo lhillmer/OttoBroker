@@ -1,5 +1,3 @@
-import asyncio
-import async_timeout
 import urllib.request
 import logging
 
