@@ -90,3 +90,17 @@ class PostgresWrapper():
     def broker_sell_regular_stock(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
         result_table = self._query_wrapper("SELECT ottobroker.sellregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
         return result_table[0][0]
+    
+    def broker_get_watches(self, user_id):
+        rawVals = self._query_wrapper("SELECT * from ottobroker.watches WHERE userid=%s;", [user_id])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerWatch(raw))
+        return result
+    
+    def broker_update_watch(self, user_id, symbol, value):
+        # TODO: figure out how to verify this actually 'worked'
+        self._query_wrapper("UPDATE ottobroker.watches set watch_cost=%s WHERE userid=%s and ticker=%s;", [value, user_id, symbol], doFetch=False)
+    
+    def broker_create_watch(self, user_id, symbol, value):
+        return self._query_wrapper("INSERT INTO ottobroker.watches (userid, ticker, watch_cost) VALUES (%s, %s, %s) RETURNING id;", [user_id, symbol, value])[0][0]

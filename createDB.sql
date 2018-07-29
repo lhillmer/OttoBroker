@@ -53,6 +53,14 @@ CREATE TABLE ottobroker.fakestocks(
     FOREIGN KEY(userid) REFERENCES ottobroker.users(id),
     FOREIGN KEY(txid) REFERENCES ottobroker.faketransactions(id)
 );
+CREATE TABLE ottobroker.watches(
+    id serial NOT NULL,
+    userid varchar(256) NOT NULL,
+    ticker varchar(10) NOT NULL,
+    watch_cost NUMERIC(100, 2) NOT NULL,
+    PRIMARY KEY(id),
+    FOREIGN KEY(userid) REFERENCES ottobroker.users(id)
+);
 
 INSERT INTO ottobroker.faketransactiontypes (txtype) values ('BUY'), ('SELL'), ('CAPITAL');
 INSERT INTO ottobroker.fakestocktypes (stocktype) values ('REGULAR');

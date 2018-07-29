@@ -76,6 +76,15 @@ class OttoBroker():
                 stock_dict[stock.ticker_symbol] = [stock]
 
         user.historical_stocks = stock_dict
+
+        watch_list = self._db.broker_get_watches(user_id)
+        
+        # create a dictionary of the stocks, grouped by ticker
+        stock_dict = {}
+        for stock in watch_list:
+            stock_dict[stock.ticker_symbol] = stock
+
+        user.watches = stock_dict
         
         self._user_cache[user.id] = user
 
@@ -381,4 +390,40 @@ class OttoBroker():
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
             'test_mode': self._test_mode
+        }
+
+    def set_watch(self, user_id, symbol, api_key):
+        if not self._is_valid_api_user(api_key):
+            return self.return_failure('Invalid api_key', do_log=False)
+
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+
+        stock_val = self.get_stock_value([symbol])
+
+        if stock_val[self.STATUS_KEY] != self.STATUS_SUCCESS:
+            # don't need to log here, because the error is presumably also logged in get_stock_value
+            return self.return_failure('Failed getting stock value: {}'.format(stock_val[self.MESSAGE_KEY]), do_log=False)
+        if symbol not in stock_val:
+            # bwuh? This really shouldn't happen
+            return self.return_failure('Symbol {} missing from stock response. Please check the logs...'.format(symbol))
+        if stock_val[symbol][self.STATUS_KEY] != self.STATUS_SUCCESS:
+            return self.return_failure('Failed to get stock value for symbol {}. Messsage: {}'.format(symbol,
+                                                                                                      stock_val[symbol][self.MESSAGE_KEY]))
+        
+        watch_cost = stock_val[symbol][self.VALUE_KEY]
+
+        if symbol in user.watches:
+            self._db.broker_update_watch(user_id, symbol, watch_cost)
+        else:
+            if not self._db.broker_create_watch(user_id, symbol, watch_cost):
+                return self.return_failure('Failed creating watch. Go yell at otto')
+        
+        self._update_single_user(user_id)
+        new_user = self._get_user(user_id)
+        return {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user': new_user.to_dict(shallow=False, historical=True)
         }

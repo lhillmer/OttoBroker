@@ -239,7 +239,19 @@ if __name__ == '__main__':
 
         return jsonify(broker.sell_stock(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
     
+    @app.route('/broker/set_watch')
+    def set_watch():
+        if APIKEY_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=APIKEY_KEY)))
 
+        if USERID_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=USERID_KEY)))
+
+        if SYMBOL_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=SYMBOL_KEY)))
+
+        return jsonify(broker.set_watch(request.args[USERID_KEY], request.args[SYMBOL_KEY].upper(), request.args[APIKEY_KEY]))
+    
 
     app.run(
         debug=False,
