@@ -18,6 +18,7 @@ class OttoBroker():
     STATUS_KEY = 'status'
     MESSAGE_KEY = 'message'
     VALUE_KEY = 'value'
+    NAME_KEY = 'name'
 
     STATUS_SUCCESS = 'success'
     STATUS_ERROR = 'error'
@@ -174,7 +175,8 @@ class OttoBroker():
                 else:
                     result[symbol] = {
                         self.STATUS_KEY: self.STATUS_SUCCESS,
-                        self.VALUE_KEY: Decimal(str(data[symbol]['quote']['latestPrice']))
+                        self.VALUE_KEY: Decimal(str(data[symbol]['quote']['latestPrice'])),
+                        self.NAME_KEY: data[symbol]['quote']['companyName']
                     }
 
             result[self.STATUS_KEY] = self.STATUS_SUCCESS
