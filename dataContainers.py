@@ -1,3 +1,7 @@
+import logging
+
+_logger = logging.getLogger()
+
 class BrokerAPIUser():
     def __init__(self, raw):
         self.id = raw[0]
@@ -16,12 +20,14 @@ class BrokerUser():
         self.historical_shorts = dict()
         self.watches = dict()
     
-    def to_dict(self, shallow=False, historical=True):
+    def to_dict(self, assets, liabilities, stock_vals, shallow=False):
         result = {
             'id': self.id,
             'created_date': self.created,
             'balance': self.balance,
-            'display_name': self.display_name
+            'display_name': self.display_name,
+            'assets': assets,
+            'liabilities': liabilities
         }
         
         long_dict = {}
@@ -31,25 +37,36 @@ class BrokerUser():
         watch_dict = {}
         
         if not shallow:
-            for symbol in self.longs:
-                long_dict[symbol] = [x.to_dict() for x in self.longs[symbol]]
-            for symbol in self.shorts:
-                short_dict[symbol] = [x.to_dict() for x in self.shorts[symbol]]
+            long_dict = self._get_stock_dict(self.longs, stock_vals, False)
+            short_dict = self._get_stock_dict(self.shorts, stock_vals, False)
 
-            if historical:
-                for symbol in self.historical_longs:
-                    historical_long_dict[symbol] = [x.to_dict() for x in self.historical_longs[symbol]]
-                for symbol in self.historical_shorts:
-                    historical_short_dict[symbol] = [x.to_dict() for x in self.historical_shorts[symbol]]
+            historical_long_dict = self._get_stock_dict(self.historical_longs, stock_vals, True)
+            historical_short_dict = self._get_stock_dict(self.historical_shorts, stock_vals, True)
             
             for symbol in self.watches:
                 watch_dict[symbol] = self.watches[symbol].watch_cost
 
-        result['historical_longs'] = historical_long_dict
-        result['longs'] = long_dict
+        result['historical_holdings'] = historical_long_dict
+        result['holdings'] = long_dict
         result['shorts'] = short_dict
         result['historical_shorts'] = historical_short_dict
         result['watches'] = watch_dict
+        
+        return result
+    
+    @staticmethod
+    def _get_stock_dict(stock_dict, stock_vals, is_historical):
+        result = {}
+        for symbol in stock_dict:
+            result[symbol] = {
+                'name': stock_vals[symbol]['name'],
+                'stocks': [x.to_dict() for x in stock_dict[symbol]],
+                'stock_count': sum([x.count for x in stock_dict[symbol]])
+            }
+
+            if not is_historical:
+                result[symbol]['per_value'] = stock_vals[symbol]['value']
+                result[symbol]['total_value'] = sum([x.count for x in stock_dict[symbol]]) * stock_vals[symbol]['value']
         
         return result
 
@@ -60,7 +77,7 @@ class BrokerStock():
         self.ticker_symbol = raw[2]
         self.purchase_cost = raw[3]
         self.sell_cost = raw[4]
-        self.count = raw[5]
+        self.count = int(raw[5])
 
     def to_dict(self):
         return {

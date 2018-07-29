@@ -30,7 +30,6 @@ AMOUNT_KEY = 'amount'
 REASON_KEY = 'reason'
 QUANTITY_KEY = 'quantity'
 SHALLOW_KEY = 'shallow'
-HISTORICAL_KEY = 'historical'
 
 # error messages
 MISSING_PARAM_MSG = 'missing required parameter: {param}'
@@ -58,8 +57,7 @@ if __name__ == '__main__':
 
     broker = OttoBroker(
         config.get('DEFAULT', 'connection_string'),
-        config.get('DEFAULT', 'broker_key'),
-        config.get('DEFAULT', 'test_user_id'),
+        config.get('DEFAULT', 'test_connection_string'),
         int(config.get('DEFAULT', 'max_liabilities_ratio')),
     )
 
@@ -113,17 +111,8 @@ if __name__ == '__main__':
                 shallow = True
             elif shallow.lower() == STR_FALSE.lower():
                 shallow = False
-
-        if HISTORICAL_KEY not in request.args:
-            historical = False
-        else:
-            historical = request.args[HISTORICAL_KEY]
-            if historical.lower() == STR_TRUE.lower():
-                historical = True
-            elif historical.lower() == STR_FALSE.lower():
-                historical = False
             
-        return jsonify(broker.get_user_info(request.args[USERID_KEY], shallow, historical))
+        return jsonify(broker.get_user_info(request.args[USERID_KEY], shallow))
     
     @app.route('/broker/all_users')
     def get_all_users():
@@ -135,17 +124,8 @@ if __name__ == '__main__':
                 shallow = True
             elif shallow.lower() == STR_FALSE.lower():
                 shallow = False
-
-        if HISTORICAL_KEY not in request.args:
-            historical = False
-        else:
-            historical = request.args[HISTORICAL_KEY]
-            if historical.lower() == STR_TRUE.lower():
-                historical = True
-            elif historical.lower() == STR_FALSE.lower():
-                historical = False
             
-        return jsonify(broker.get_all_users(shallow, historical))
+        return jsonify(broker.get_all_users(shallow))
     
     @app.route('/broker/register')
     def register_user():

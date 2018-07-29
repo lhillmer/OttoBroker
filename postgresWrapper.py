@@ -49,21 +49,25 @@ class PostgresWrapper():
         return result_table[0][0]
     
     def broker_get_single_user(self, user_id):
-        return BrokerUser(self._query_wrapper("SELECT * FROM ottobroker.users WHERE id=%s;", [user_id])[0])
+        result = self._query_wrapper("SELECT * FROM ottobroker.users WHERE id=%s;", [user_id])
+        if len(result) > 0:
+            return BrokerUser(result[0])
+        else:
+            return None
     
-    def broker_get_all_users(self):
-        rawVals = self._query_wrapper("SELECT * FROM ottobroker.users;", [])
+    def broker_get_all_user_ids(self):
+        rawVals = self._query_wrapper("SELECT id FROM ottobroker.users;", [])
         result = []
-        for raw in rawVals:
-            result.append(BrokerUser(raw))
+        for row in rawVals:
+            result.append(row[0])
         return result
     
-    def broker_get_all_api_users(self):
-        rawVals = self._query_wrapper("SELECT * FROM ottobroker.apiusers;", [])
-        result = []
-        for raw in rawVals:
-            result.append(BrokerAPIUser(raw))
-        return result
+    def broker_get_single_api_users(self, api_key):
+        result = self._query_wrapper("SELECT * FROM ottobroker.apiusers where apikey=%s;", [api_key])
+        if len(result) > 0:
+            return BrokerAPIUser(result[0])
+        else:
+            return None
     
     def broker_get_longs_by_user(self, user_id):
         rawVals = self._query_wrapper("""SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id)
