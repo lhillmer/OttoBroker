@@ -104,3 +104,6 @@ class PostgresWrapper():
     
     def broker_create_watch(self, user_id, symbol, value):
         return self._query_wrapper("INSERT INTO ottobroker.watches (userid, ticker, watch_cost) VALUES (%s, %s, %s) RETURNING id;", [user_id, symbol, value])[0][0]
+    
+    def broker_remove_watch(self, user_id, symbol):
+        self._query_wrapper("DELETE FROM ottobroker.watches WHERE userid=%s and ticker=%s;", [user_id, symbol], doFetch=False)

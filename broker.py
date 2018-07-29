@@ -427,3 +427,24 @@ class OttoBroker():
             self.STATUS_KEY: self.STATUS_SUCCESS,
             'user': new_user.to_dict(shallow=False, historical=True)
         }
+
+    def remove_watch(self, user_id, symbol, api_key):
+        if not self._is_valid_api_user(api_key):
+            return self.return_failure('Invalid api_key', do_log=False)
+
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+        
+        if symbol in user.watches:
+            self._db.broker_remove_watch(user_id, symbol)
+        else:
+            return self.return_failure('No matching watch to remove', do_log=False)
+        
+        self._update_single_user(user_id)
+        new_user = self._get_user(user_id)
+        return {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user': new_user.to_dict(shallow=False, historical=True)
+        }
