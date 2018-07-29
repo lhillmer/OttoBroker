@@ -60,6 +60,7 @@ if __name__ == '__main__':
         config.get('DEFAULT', 'connection_string'),
         config.get('DEFAULT', 'broker_key'),
         config.get('DEFAULT', 'test_user_id'),
+        int(config.get('DEFAULT', 'max_liabilities_ratio')),
     )
 
     app = Flask(__name__)
@@ -197,8 +198,8 @@ if __name__ == '__main__':
 
         return jsonify(broker.withdraw(request.args[USERID_KEY], amount, request.args[REASON_KEY], request.args[APIKEY_KEY]))
     
-    @app.route('/broker/buy_stock')
-    def buy_stock():
+    @app.route('/broker/buy_long')
+    def buy_long():
         if APIKEY_KEY not in request.args:
             return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=APIKEY_KEY)))
 
@@ -216,10 +217,10 @@ if __name__ == '__main__':
         except Exception:
             return jsonify(broker.return_failure(INVALID_TYPE_MSG.format(param=QUANTITY_KEY, type='int')))
 
-        return jsonify(broker.buy_stock(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
+        return jsonify(broker.buy_long(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
     
-    @app.route('/broker/sell_stock')
-    def sell_stock():
+    @app.route('/broker/sell_long')
+    def sell_long():
         if APIKEY_KEY not in request.args:
             return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=APIKEY_KEY)))
 
@@ -237,7 +238,49 @@ if __name__ == '__main__':
         except Exception:
             return jsonify(broker.return_failure(INVALID_TYPE_MSG.format(param=QUANTITY_KEY, type='int')))
 
-        return jsonify(broker.sell_stock(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
+        return jsonify(broker.sell_long(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
+    
+    @app.route('/broker/buy_short')
+    def buy_short():
+        if APIKEY_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=APIKEY_KEY)))
+
+        if USERID_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=USERID_KEY)))
+
+        if SYMBOL_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=SYMBOL_KEY)))
+
+        if QUANTITY_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=QUANTITY_KEY)))
+        quantity = request.args[QUANTITY_KEY]
+        try:
+            quantity = int(quantity)
+        except Exception:
+            return jsonify(broker.return_failure(INVALID_TYPE_MSG.format(param=QUANTITY_KEY, type='int')))
+
+        return jsonify(broker.buy_short(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
+    
+    @app.route('/broker/sell_short')
+    def sell_short():
+        if APIKEY_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=APIKEY_KEY)))
+
+        if USERID_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=USERID_KEY)))
+
+        if SYMBOL_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=SYMBOL_KEY)))
+
+        if QUANTITY_KEY not in request.args:
+            return jsonify(broker.return_failure(MISSING_PARAM_MSG.format(param=QUANTITY_KEY)))
+        quantity = request.args[QUANTITY_KEY]
+        try:
+            quantity = int(quantity)
+        except Exception:
+            return jsonify(broker.return_failure(INVALID_TYPE_MSG.format(param=QUANTITY_KEY, type='int')))
+
+        return jsonify(broker.sell_short(request.args[SYMBOL_KEY].upper(), quantity, request.args[USERID_KEY], request.args[APIKEY_KEY]))
     
     @app.route('/broker/set_watch')
     def set_watch():

@@ -65,15 +65,49 @@ class PostgresWrapper():
             result.append(BrokerAPIUser(raw))
         return result
     
-    def broker_get_stocks_by_user(self, user_id):
-        rawVals = self._query_wrapper("SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id) from ottobroker.fakestocks WHERE userid=%s AND sold IS NULL GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;", [user_id])
+    def broker_get_longs_by_user(self, user_id):
+        rawVals = self._query_wrapper("""SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id)
+        FROM ottobroker.fakestocks
+        WHERE userid=%s AND
+            stocktypeid=(SELECT id FROM ottobroker.fakestocktypes WHERE stocktype='LONG') AND
+            sold IS NULL
+        GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;""", [user_id])
         result = []
         for raw in rawVals:
             result.append(BrokerStock(raw))
         return result
     
-    def broker_get_historical_stocks_by_user(self, user_id):
-        rawVals = self._query_wrapper("SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id) from ottobroker.fakestocks WHERE userid=%s AND sold IS NOT NULL GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;", [user_id])
+    def broker_get_historical_longs_by_user(self, user_id):
+        rawVals = self._query_wrapper("""SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id)
+        FROM ottobroker.fakestocks
+        WHERE userid=%s AND
+            stocktypeid=(SELECT id FROM ottobroker.fakestocktypes WHERE stocktype='LONG') AND
+            sold IS NOT NULL
+        GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;""", [user_id])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerStock(raw))
+        return result
+    
+    def broker_get_shorts_by_user(self, user_id):
+        rawVals = self._query_wrapper("""SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id)
+        FROM ottobroker.fakestocks
+        WHERE userid=%s AND
+            stocktypeid=(SELECT id FROM ottobroker.fakestocktypes WHERE stocktype='SHORT') AND
+            purchased IS NULL
+        GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;""", [user_id])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerStock(raw))
+        return result
+    
+    def broker_get_historical_shorts_by_user(self, user_id):
+        rawVals = self._query_wrapper("""SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id)
+        FROM ottobroker.fakestocks
+        WHERE userid=%s AND
+            stocktypeid=(SELECT id FROM ottobroker.fakestocktypes WHERE stocktype='SHORT') AND
+            purchased IS NOT NULL
+        GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;""", [user_id])
         result = []
         for raw in rawVals:
             result.append(BrokerStock(raw))
@@ -83,12 +117,21 @@ class PostgresWrapper():
         result_table =  self._query_wrapper("SELECT ottobroker.givemoney(%s, %s, %s, %s);", [user_id, amount, reason, api_key])
         return result_table[0][0]
     
-    def broker_buy_regular_stock(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
-        result_table =  self._query_wrapper("SELECT ottobroker.buyregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+    def broker_buy_long(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
+        result_table =  self._query_wrapper("SELECT ottobroker.buylong(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
         return result_table[0][0]
     
-    def broker_sell_regular_stock(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
-        result_table = self._query_wrapper("SELECT ottobroker.sellregularstock(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+    def broker_sell_long(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
+        result_table = self._query_wrapper("SELECT ottobroker.selllong(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+        return result_table[0][0]
+        return result_table[0][0]
+    
+    def broker_buy_short(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
+        result_table =  self._query_wrapper("SELECT ottobroker.buyshort(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
+        return result_table[0][0]
+    
+    def broker_sell_short(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
+        result_table = self._query_wrapper("SELECT ottobroker.sellshort(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
         return result_table[0][0]
     
     def broker_get_watches(self, user_id):

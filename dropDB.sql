@@ -1,7 +1,9 @@
 DROP FUNCTION ottobroker.createuser;
 DROP FUNCTION ottobroker.givemoney;
-DROP FUNCTION ottobroker.buyregularstock;
-DROP FUNCTION ottobroker.sellregularstock;
+DROP FUNCTION ottobroker.buylong;
+DROP FUNCTION ottobroker.selllong;
+DROP FUNCTION ottobroker.buyshort;
+DROP FUNCTION ottobroker.sellshort;
 DROP TABLE ottobroker.watches;
 DROP TABLE ottobroker.fakestocks;
 DROP TABLE ottobroker.fakestocktypes;

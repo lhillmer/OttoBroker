@@ -10,11 +10,13 @@ class BrokerUser():
         self.created = raw[1]
         self.display_name = raw[2]
         self.balance = raw[3]
-        self.stocks = dict()
-        self.historical_stocks = dict()
+        self.longs = dict()
+        self.historical_longs = dict()
+        self.shorts = dict()
+        self.historical_shorts = dict()
         self.watches = dict()
     
-    def to_dict(self, shallow=False, historical=False):
+    def to_dict(self, shallow=False, historical=True):
         result = {
             'id': self.id,
             'created_date': self.created,
@@ -22,23 +24,31 @@ class BrokerUser():
             'display_name': self.display_name
         }
         
-        stock_dict = {}
-        historical_stock_dict = {}
+        long_dict = {}
+        short_dict = {}
+        historical_long_dict = {}
+        historical_short_dict = {}
         watch_dict = {}
         
         if not shallow:
-            for symbol in self.stocks:
-                stock_dict[symbol] = [x.to_dict() for x in self.stocks[symbol]]
+            for symbol in self.longs:
+                long_dict[symbol] = [x.to_dict() for x in self.longs[symbol]]
+            for symbol in self.shorts:
+                short_dict[symbol] = [x.to_dict() for x in self.shorts[symbol]]
 
             if historical:
-                for symbol in self.historical_stocks:
-                    historical_stock_dict[symbol] = [x.to_dict() for x in self.historical_stocks[symbol]]
+                for symbol in self.historical_longs:
+                    historical_long_dict[symbol] = [x.to_dict() for x in self.historical_longs[symbol]]
+                for symbol in self.historical_shorts:
+                    historical_short_dict[symbol] = [x.to_dict() for x in self.historical_shorts[symbol]]
             
             for symbol in self.watches:
                 watch_dict[symbol] = self.watches[symbol].watch_cost
 
-        result['historical'] = historical_stock_dict
-        result['stocks'] = stock_dict
+        result['historical_longs'] = historical_long_dict
+        result['longs'] = long_dict
+        result['shorts'] = short_dict
+        result['historical_shorts'] = historical_short_dict
         result['watches'] = watch_dict
         
         return result
