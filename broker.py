@@ -181,6 +181,8 @@ class OttoBroker():
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         if not isinstance(quantity, int):
             return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
+        if quantity < 1:
+            return self.return_failure('Gotta buy at least 1 stock!', do_log=False)
         if not self.is_market_live():
             return self.return_failure('No trading after hours', do_log=False)
 
@@ -230,6 +232,8 @@ class OttoBroker():
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         if not isinstance(quantity, int):
             return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
+        if quantity < 1:
+            return self.return_failure('Gotta sell at least 1 stock!', do_log=False)
         if not self.is_market_live():
             return self.return_failure('No trading after hours', do_log=False)
 
@@ -252,7 +256,7 @@ class OttoBroker():
         if symbol in user.stocks:
             cur_stocks = len(user.stocks[symbol])
 
-        if cur_stocks < total_cost:
+        if cur_stocks < quantity:
             extra_vals = {
                 'quantity': quantity,
                 'symbol': symbol,

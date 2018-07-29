@@ -118,7 +118,7 @@ RETURNS INTEGER AS $BODY$
             select id into txtype_id from ottobroker.faketransactiontypes where txtype = 'BUY';
             select id into stocktype_id from ottobroker.fakestocktypes where stocktype = 'REGULAR';
             insert into ottobroker.faketransactions (txtypeid, userid, dollaramount, stockamount, ticker, executed, apiuserid)
-            values (txtype_id, _user_id, total_cost, _quantity, _ticker, _now, api_user_id) returning id into transaction_id;
+            values (txtype_id, _user_id, total_cost, _per_cost, _quantity, _ticker, _now, api_user_id) returning id into transaction_id;
             for i in 1.._quantity LOOP
             	insert into ottobroker.fakestocks (stocktypeid, userid, txid, ticker, purchase_cost, purchased)
                 values (stocktype_id, _user_id, transaction_id, _ticker, _per_cost, _now);

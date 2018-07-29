@@ -66,14 +66,14 @@ class PostgresWrapper():
         return result
     
     def broker_get_stocks_by_user(self, user_id):
-        rawVals = self._query_wrapper("SELECT * FROM ottobroker.fakestocks WHERE userid=%s and sold is NULL;", [user_id])
+        rawVals = self._query_wrapper("SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id) from ottobroker.fakestocks WHERE userid=%s AND sold IS NULL GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;", [user_id])
         result = []
         for raw in rawVals:
             result.append(BrokerStock(raw))
         return result
     
     def broker_get_historical_stocks_by_user(self, user_id):
-        rawVals = self._query_wrapper("SELECT * FROM ottobroker.fakestocks WHERE userid=%s and sold is not NULL;", [user_id])
+        rawVals = self._query_wrapper("SELECT stocktypeid, userid, ticker, purchase_cost, sell_cost, COUNT(id) from ottobroker.fakestocks WHERE userid=%s AND sold IS NOT NULL GROUP BY stocktypeid, userid, ticker, purchase_cost, sell_cost;", [user_id])
         result = []
         for raw in rawVals:
             result.append(BrokerStock(raw))

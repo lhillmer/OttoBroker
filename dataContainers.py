@@ -41,25 +41,18 @@ class BrokerUser():
 
 class BrokerStock():
     def __init__(self, raw):
-        self.id = raw[0]
-        self.stock_type = raw[1]
-        self.user_id = raw[2]
-        self.transaction_id = raw[3]
-        self.ticker_symbol = raw[4]
-        self.purchase_cost = raw[5]
-        self.purchase_time = raw[6]
-        self.expiration_time = raw[7]
-        self.sell_cost = raw[8]
-        self.sell_time = raw[9]
+        self.stock_type = raw[0]
+        self.user_id = raw[1]
+        self.ticker_symbol = raw[2]
+        self.purchase_cost = raw[3]
+        self.sell_cost = raw[4]
+        self.count = raw[5]
 
     def to_dict(self):
         return {
-            'id': self.id,
             'stock_type': self.stock_type,
             'symbol': self.ticker_symbol,
             'purchase_cost': self.purchase_cost,
-            'purchase_time': self.purchase_time,
-            'expiration_time': self.expiration_time,
             'sell_cost': self.sell_cost,
-            'sell_time': self.sell_time
+            'count': self.count
         }
