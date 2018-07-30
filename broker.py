@@ -37,21 +37,22 @@ class OttoBroker():
     def _is_valid_api_user(self, api_key):
         return self._cur_db.broker_get_single_api_users(api_key) != None
 
-    def _get_user(self, user_id):
+    def _get_user(self, user_id, shallow=False):
         user = self._cur_db.broker_get_single_user(user_id)
         if user is None:
             return None
 
-        user.longs = self._convert_stock_list_to_dict(self._cur_db.broker_get_longs_by_user(user_id))
-        user.historical_longs = self._convert_stock_list_to_dict(self._cur_db.broker_get_historical_longs_by_user(user_id))
-        user.shorts = self._convert_stock_list_to_dict(self._cur_db.broker_get_shorts_by_user(user_id))
-        user.historical_shorts = self._convert_stock_list_to_dict(self._cur_db.broker_get_historical_shorts_by_user(user_id))
+        if not shallow:
+            user.longs = self._convert_stock_list_to_dict(self._cur_db.broker_get_longs_by_user(user_id))
+            user.historical_longs = self._convert_stock_list_to_dict(self._cur_db.broker_get_historical_longs_by_user(user_id))
+            user.shorts = self._convert_stock_list_to_dict(self._cur_db.broker_get_shorts_by_user(user_id))
+            user.historical_shorts = self._convert_stock_list_to_dict(self._cur_db.broker_get_historical_shorts_by_user(user_id))
 
-        watch_list = self._cur_db.broker_get_watches(user_id)
-        watch_dict = {}
-        for stock in watch_list:
-            watch_dict[stock.ticker_symbol] = stock
-        user.watches = watch_dict
+            watch_list = self._cur_db.broker_get_watches(user_id)
+            watch_dict = {}
+            for stock in watch_list:
+                watch_dict[stock.ticker_symbol] = stock
+            user.watches = watch_dict
         
         return user
     
@@ -105,7 +106,12 @@ class OttoBroker():
         return (user_liabilities * self._max_liabilities_ratio) > user_assets
 
     def _get_full_user_dict(self, user, shallow=False):
-        assets, liabilities, stock_vals = self._get_user_net_worth(user)
+        if shallow:
+            assets = None
+            liabilities = None
+            stock_vals = None
+        else:
+            assets, liabilities, stock_vals = self._get_user_net_worth(user)
         return user.to_dict(assets, liabilities, stock_vals, shallow=shallow)
 
     def is_market_live(self, time=None):
@@ -470,7 +476,7 @@ class OttoBroker():
         }
 
         for userid in self._cur_db.broker_get_all_user_ids():
-            user = self._get_user(userid)
+            user = self._get_user(userid, shallow)
             result['user_list'].append(self._get_full_user_dict(user))
 
         return result
