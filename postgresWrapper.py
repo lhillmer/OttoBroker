@@ -128,7 +128,6 @@ class PostgresWrapper():
     def broker_sell_long(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
         result_table = self._query_wrapper("SELECT ottobroker.selllong(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
         return result_table[0][0]
-        return result_table[0][0]
     
     def broker_buy_short(self, user_id, ticker_symbol, ticker_value, quantity, api_key):
         result_table =  self._query_wrapper("SELECT ottobroker.buyshort(%s, %s, %s, %s, %s);", [user_id, ticker_symbol, ticker_value, quantity, api_key])
