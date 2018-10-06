@@ -18,78 +18,101 @@ class OttoBroker():
     STATUS_KEY = 'status'
     MESSAGE_KEY = 'message'
     VALUE_KEY = 'value'
+    NAME_KEY = 'name'
 
     STATUS_SUCCESS = 'success'
     STATUS_ERROR = 'error'
 
-    def __init__(self, db_connection_string, api_key, test_user_id):
+    def __init__(self, db_connection_string, test_connection_string, max_liabilities_ratio):
         self._rest = RestWrapper("https://api.iextrading.com/1.0", {})
+
         self._db = PostgresWrapper(db_connection_string)
-        self._user_cache = {}
-        self._user_stocks = {}
-        self._api_users = {}
+        self._test_db = PostgresWrapper(test_connection_string)
 
         self._test_mode = False
-        self._test_user_id = test_user_id
+        self._cur_db = self._db
 
-        self._populate_user_cache()
-        self._populate_api_user_cache()
-    
-    def _populate_api_user_cache(self):
-        self._api_users = {}
-        api_user_list = self._db.broker_get_all_api_users()
+        self._max_liabilities_ratio = max_liabilities_ratio
 
-        for user in api_user_list:
-            self._api_users[user.api_key] = user
-
-    def _populate_user_cache(self):
-        self._user_cache = {}
-        # TODO:update this to just get all user_ids, since we're kinda just dumping the user objects
-        user_list = self._db.broker_get_all_users()
-
-        for user in user_list:
-            self._update_single_user(user.id)
-    
-    def _update_single_user(self, user_id):
-        user = self._db.broker_get_single_user(user_id)
-
-        stock_list = self._db.broker_get_stocks_by_user(user_id)
-        
-        # create a dictionary of the stocks, grouped by ticker
-        stock_dict = {}
-        for stock in stock_list:
-            if stock.ticker_symbol in stock_dict:
-                stock_dict[stock.ticker_symbol].append(stock)
-            else:
-                stock_dict[stock.ticker_symbol] = [stock]
-
-        user.stocks = stock_dict
-
-        historical_stock_list = self._db.broker_get_historical_stocks_by_user(user_id)
-        
-        # create a dictionary of the stocks, grouped by ticker
-        stock_dict = {}
-        for stock in historical_stock_list:
-            if stock.ticker_symbol in stock_dict:
-                stock_dict[stock.ticker_symbol].append(stock)
-            else:
-                stock_dict[stock.ticker_symbol] = [stock]
-
-        user.historical_stocks = stock_dict
-        
-        self._user_cache[user.id] = user
-
-    def _get_user(self, user_id):
-        if self._test_mode:
-            return self._user_cache[self._test_user_id]
-        if user_id in self._user_cache:
-            return self._user_cache[user_id]
-        else:
-            return None
-            
     def _is_valid_api_user(self, api_key):
-        if api_key in self._api_users:
-            return True
+        return self._cur_db.broker_get_single_api_users(api_key) != None
+
+    def _get_user(self, user_id, shallow=False):
+        user = self._cur_db.broker_get_single_user(user_id)
+        if user is None:
+            return None
+
+        if not shallow:
+            user.longs = self._convert_stock_list_to_dict(self._cur_db.broker_get_longs_by_user(user_id))
+            user.historical_longs = self._convert_stock_list_to_dict(self._cur_db.broker_get_historical_longs_by_user(user_id))
+            user.shorts = self._convert_stock_list_to_dict(self._cur_db.broker_get_shorts_by_user(user_id))
+            user.historical_shorts = self._convert_stock_list_to_dict(self._cur_db.broker_get_historical_shorts_by_user(user_id))
+
+            watch_list = self._cur_db.broker_get_watches(user_id)
+            watch_dict = {}
+            for stock in watch_list:
+                watch_dict[stock.ticker_symbol] = stock
+            user.watches = watch_dict
+        
+        return user
+    
+    @staticmethod
+    def _convert_stock_list_to_dict(stock_list):
+        result_dict = {}
+        for stock in stock_list:
+            if stock.ticker_symbol in result_dict:
+                result_dict[stock.ticker_symbol].append(stock)
+            else:
+                result_dict[stock.ticker_symbol] = [stock]
+        return result_dict
+    
+    def _get_user_net_worth(self, user):
+        symbols = list(user.longs.keys())
+        symbols.extend(list(user.historical_longs.keys()))
+        symbols.extend(list(user.shorts.keys()))
+        symbols.extend(list(user.historical_shorts.keys()))
+        symbols = set(symbols)
+
+        if symbols:
+            stock_vals = self.get_stock_value(list(symbols))
+        else:
+            stock_vals = {}
+
+        assets = Decimal(user.balance)
+        liabilities = Decimal(0)
+
+        for l in user.longs:
+            total_count = 0
+            for stock in user.longs[l]:
+                total_count += stock.count
+            assets += stock_vals[l][self.VALUE_KEY] * total_count
+            assets = Decimal(assets.quantize(Decimal('.01'), rounding=ROUND_HALF_UP))
+
+        for s in user.shorts:
+            total_count = 0
+            for stock in user.shorts[s]:
+                total_count += stock.count
+            liabilities += stock_vals[s][self.VALUE_KEY] * total_count
+            liabilities = Decimal(liabilities.quantize(Decimal('.01'), rounding=ROUND_HALF_UP))
+        
+        return assets, liabilities, stock_vals
+    
+    def _too_much_liability(self, user, additional_liability=None):
+        user_assets, user_liabilities, _ = self._get_user_net_worth(user)
+
+        if additional_liability is not None:
+            user_liabilities += additional_liability
+
+        return (user_liabilities * self._max_liabilities_ratio) > user_assets
+
+    def _get_full_user_dict(self, user, shallow=False):
+        if shallow:
+            assets = None
+            liabilities = None
+            stock_vals = None
+        else:
+            assets, liabilities, stock_vals = self._get_user_net_worth(user)
+        return user.to_dict(assets, liabilities, stock_vals, shallow=shallow)
 
     def is_market_live(self, time=None):
         if self._test_mode:
@@ -165,7 +188,8 @@ class OttoBroker():
                 else:
                     result[symbol] = {
                         self.STATUS_KEY: self.STATUS_SUCCESS,
-                        self.VALUE_KEY: Decimal(str(data[symbol]['quote']['latestPrice']))
+                        self.VALUE_KEY: Decimal(str(data[symbol]['quote']['latestPrice'])),
+                        self.NAME_KEY: data[symbol]['quote']['companyName']
                     }
 
             result[self.STATUS_KEY] = self.STATUS_SUCCESS
@@ -174,7 +198,7 @@ class OttoBroker():
 
         return result
     
-    def buy_stock(self, symbol, quantity, user_id, api_key):
+    def buy_long(self, symbol, quantity, user_id, api_key):
         user = self._get_user(user_id)
 
         if not user:
@@ -207,25 +231,27 @@ class OttoBroker():
                 'total_amt': total_cost,
                 'quantity': quantity,
                 'symbol': symbol,
-                'user': user.to_dict()
+                'user': self._get_full_user_dict(user)
             }
             return self.return_failure('Insufficient funds', extra_vals=extra_vals, do_log=False)
         
-        if self._db.broker_buy_regular_stock(user.id, symbol, per_stock_cost, quantity, api_key) is None:
-            return self.return_failure('buying stocks failed. Ensure you have a valid API key')
+        if self._too_much_liability(user):
+            return self.return_failure('Your liabilities are too large. Buy back shorts to be allowed to purchase stocks', do_log=False)
         
-        self._update_single_user(user.id)
+        if self._cur_db.broker_buy_long(user.id, symbol, per_stock_cost, quantity, api_key) is None:
+            return self.return_failure('buying long failed. Ensure you have a valid API key')
+        
         user = self._get_user(user.id)
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict(),
+            'user': self._get_full_user_dict(user),
             'total_amt': total_cost,
             'per_stock_amt': per_stock_cost,
             'quantity': quantity,
             'symbol': symbol
         }
     
-    def sell_stock(self, symbol, quantity, user_id, api_key):
+    def sell_long(self, symbol, quantity, user_id, api_key):
         user = self._get_user(user_id)
 
         if not user:
@@ -253,25 +279,131 @@ class OttoBroker():
         total_cost = per_stock_cost * quantity
 
         cur_stocks = 0
-        if symbol in user.stocks:
-            cur_stocks = len(user.stocks[symbol])
+        if symbol in user.longs:
+            for stock in user.longs[symbol]:
+                cur_stocks += stock.count
 
         if cur_stocks < quantity:
             extra_vals = {
                 'quantity': quantity,
                 'symbol': symbol,
-                'user': user.to_dict()
+                'user': self._get_full_user_dict(user)
             }
-            return self.return_failure('Insufficient stocks', extra_vals=extra_vals, do_log=False)
+            return self.return_failure('Insufficient longs to sell', extra_vals=extra_vals, do_log=False)
         
-        if self._db.broker_sell_regular_stock(user.id, symbol, per_stock_cost, quantity, api_key) is None:
-            return self.return_failure('selling stocks failed. Ensure you have a valid API key')
+        if self._cur_db.broker_sell_long(user.id, symbol, per_stock_cost, quantity, api_key) is None:
+            return self.return_failure('selling long failed. Ensure you have a valid API key')
         
-        self._update_single_user(user.id)
         user = self._get_user(user.id)
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict(),
+            'user': self._get_full_user_dict(user),
+            'total_amt': total_cost,
+            'per_stock_amt': per_stock_cost,
+            'quantity': quantity,
+            'symbol': symbol
+        }
+    
+    def buy_short(self, symbol, quantity, user_id, api_key):
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+        if not isinstance(quantity, int):
+            return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
+        if quantity < 1:
+            return self.return_failure('Gotta buy at least 1 stock!', do_log=False)
+        if not self.is_market_live():
+            return self.return_failure('No trading after hours', do_log=False)
+
+        stock_val = self.get_stock_value([symbol])
+
+        if stock_val[self.STATUS_KEY] != self.STATUS_SUCCESS:
+            # don't need to log here, because the error is presumably also logged in get_stock_value
+            return self.return_failure('Failed getting stock value: {}'.format(stock_val[self.MESSAGE_KEY]), do_log=False)
+        if symbol not in stock_val:
+            # bwuh? This really shouldn't happen
+            return self.return_failure('Symbol {} missing from stock response. Please check the logs...'.format(symbol))
+        if stock_val[symbol][self.STATUS_KEY] != self.STATUS_SUCCESS:
+            return self.return_failure('Failed to get stock value for symbol {}. Messsage: {}'.format(symbol,
+                                                                                                      stock_val[symbol][self.MESSAGE_KEY]))
+
+        per_stock_cost = stock_val[symbol][self.VALUE_KEY]
+        total_cost = per_stock_cost * quantity
+
+        if user.balance < total_cost:
+            extra_vals = {
+                'per_stock_amt': per_stock_cost,
+                'total_amt': total_cost,
+                'quantity': quantity,
+                'symbol': symbol,
+                'user': self._get_full_user_dict(user)
+            }
+            return self.return_failure('Insufficient funds', extra_vals=extra_vals, do_log=False)
+        
+        cur_stocks = 0
+        if symbol in user.shorts:
+            for stock in user.shorts[symbol]:
+                cur_stocks += stock.count
+
+        if cur_stocks < quantity:
+            extra_vals = {
+                'quantity': quantity,
+                'symbol': symbol,
+                'user': self._get_full_user_dict(user)
+            }
+            return self.return_failure('Insufficient shorts to buy back', extra_vals=extra_vals, do_log=False)
+
+        if self._cur_db.broker_buy_short(user.id, symbol, per_stock_cost, quantity, api_key) is None:
+            return self.return_failure('buying short failed. Ensure you have a valid API key')
+        
+        user = self._get_user(user.id)
+        return {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user': self._get_full_user_dict(user),
+            'total_amt': total_cost,
+            'per_stock_amt': per_stock_cost,
+            'quantity': quantity,
+            'symbol': symbol
+        }
+    
+    def sell_short(self, symbol, quantity, user_id, api_key):
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+        if not isinstance(quantity, int):
+            return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
+        if quantity < 1:
+            return self.return_failure('Gotta sell at least 1 stock!', do_log=False)
+        if not self.is_market_live():
+            return self.return_failure('No trading after hours', do_log=False)
+
+        stock_val = self.get_stock_value([symbol])
+
+        if stock_val[self.STATUS_KEY] != self.STATUS_SUCCESS:
+            # don't need to log here, because the error is presumably also logged in get_stock_value
+            return self.return_failure('Failed getting stock value: {}'.format(stock_val[self.MESSAGE_KEY]), do_log=False)
+        if symbol not in stock_val:
+            # bwuh? This really shouldn't happen
+            return self.return_failure('Symbol {} missing from stock response. Please check the logs...'.format(symbol))
+        if stock_val[symbol][self.STATUS_KEY] != self.STATUS_SUCCESS:
+            return self.return_failure('Failed to get stock value for symbol {}. Messsage: {}'.format(symbol,
+                                                                                                      stock_val[symbol][self.MESSAGE_KEY]))
+
+        per_stock_cost = stock_val[symbol][self.VALUE_KEY]
+        total_cost = per_stock_cost * quantity
+        
+        if self._too_much_liability(user, additional_liability=total_cost):
+            return self.return_failure('Your liabilities are too large. Buy back shorts to be allowed to acquire other shorts', do_log=False)
+        
+        if self._cur_db.broker_sell_short(user.id, symbol, per_stock_cost, quantity, api_key) is None:
+            return self.return_failure('selling short failed. Ensure you have a valid API key')
+        
+        user = self._get_user(user.id)
+        return {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user': self._get_full_user_dict(user),
             'total_amt': total_cost,
             'per_stock_amt': per_stock_cost,
             'quantity': quantity,
@@ -288,17 +420,16 @@ class OttoBroker():
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         # make sure the user can afford the transaction
         if user.balance < amount:
-            return self.return_failure('Insufficient cash to withdraw', do_log=False, extra_vals={'user': user.to_dict()})
+            return self.return_failure('Insufficient cash to withdraw', do_log=False, extra_vals={'user': self._get_full_user_dict(user)})
 
-        if self._db.broker_give_money_to_user(user.id, -amount, reason, api_key) is None:
+        if self._cur_db.broker_give_money_to_user(user.id, -amount, reason, api_key) is None:
             return self.return_failure('withdraw failed. Ensure you have a valid API key')
 
-        self._update_single_user(user.id)
         user = self._get_user(user.id)
 
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict(),
+            'user': self._get_full_user_dict(user),
             'amount': amount,
         }
 
@@ -311,48 +442,42 @@ class OttoBroker():
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
 
-        if self._db.broker_give_money_to_user(user.id, amount, reason, api_key) is None:
+        if self._cur_db.broker_give_money_to_user(user.id, amount, reason, api_key) is None:
             return self.return_failure('deposit failed. Ensure you have a valid API key')
 
-        self._update_single_user(user.id)
         user = self._get_user(user.id)
 
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict()
+            'user': self._get_full_user_dict(user)
         }
 
-    def get_user_info(self, user_id, shallow, historical):
+    def get_user_info(self, user_id, shallow):
         user = self._get_user(user_id)
 
         if not isinstance(shallow, bool):
             return self.return_failure('shallow must be either \'True\' or \'False\'', do_log=False)
-
-        if not isinstance(historical, bool):
-            return self.return_failure('historical must be either \'True\' or \'False\'', do_log=False)
 
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
 
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': user.to_dict(shallow, historical)
+            'user': self._get_full_user_dict(user, shallow=shallow)
         }
     
-    def get_all_users(self, shallow, historical):
+    def get_all_users(self, shallow):
         if not isinstance(shallow, bool):
             return self.return_failure('shallow must be either \'True\' or \'False\'', do_log=False)
-
-        if not isinstance(historical, bool):
-            return self.return_failure('historical must be either \'True\' or \'False\'', do_log=False)
 
         result = {
             self.STATUS_KEY: self.STATUS_SUCCESS,
             'user_list': []
         }
 
-        for u in self._user_cache:
-            result['user_list'].append(self._user_cache[u].to_dict(shallow, historical))
+        for userid in self._cur_db.broker_get_all_user_ids():
+            user = self._get_user(userid, shallow)
+            result['user_list'].append(self._get_full_user_dict(user))
 
         return result
 
@@ -363,22 +488,83 @@ class OttoBroker():
         if user is not None:
             return self.return_failure('User with id {} already exists'.format(user.id), do_log=False)
         
-        if self._db.broker_create_user(user_id, display_name, api_key) is None:
+        if self._cur_db.broker_create_user(user_id, display_name, api_key) is None:
             return self.return_failure('User could not be created. Ensure you have a valid API key')
 
-        self._update_single_user(user_id)
-        new_user = self._get_user(user_id)
+        user = self._get_user(user_id)
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
-            'user': new_user.to_dict(shallow=False, historical=True)
+            'user': self._get_full_user_dict(user)
         }
 
     def toggle_test_mode(self, api_key):
         if not self._is_valid_api_user(api_key):
             return self.return_failure('Invalid api_key', do_log=False)
         
-        self._test_mode = not self._test_mode
+        if self._test_mode:
+            self._test_mode = False
+            self._cur_db = self._db
+        else:
+            self._test_mode = True
+            self._cur_db = self._test_db
         return {
             self.STATUS_KEY: self.STATUS_SUCCESS,
             'test_mode': self._test_mode
+        }
+
+    def set_watch(self, user_id, symbol, api_key):
+        if not self._is_valid_api_user(api_key):
+            return self.return_failure('Invalid api_key', do_log=False)
+
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+
+        stock_val = self.get_stock_value([symbol])
+
+        if stock_val[self.STATUS_KEY] != self.STATUS_SUCCESS:
+            # don't need to log here, because the error is presumably also logged in get_stock_value
+            return self.return_failure('Failed getting stock value: {}'.format(stock_val[self.MESSAGE_KEY]), do_log=False)
+        if symbol not in stock_val:
+            # bwuh? This really shouldn't happen
+            return self.return_failure('Symbol {} missing from stock response. Please check the logs...'.format(symbol))
+        if stock_val[symbol][self.STATUS_KEY] != self.STATUS_SUCCESS:
+            return self.return_failure('Failed to get stock value for symbol {}. Messsage: {}'.format(symbol,
+                                                                                                      stock_val[symbol][self.MESSAGE_KEY]))
+        
+        watch_cost = stock_val[symbol][self.VALUE_KEY]
+
+        if symbol in user.watches:
+            self._cur_db.broker_update_watch(user.id, symbol, watch_cost)
+        else:
+            if not self._cur_db.broker_create_watch(user.id, symbol, watch_cost):
+                return self.return_failure('Failed creating watch. Go yell at otto')
+        
+        user = self._get_user(user_id)
+
+        return {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user': self._get_full_user_dict(user)
+        }
+
+    def remove_watch(self, user_id, symbol, api_key):
+        if not self._is_valid_api_user(api_key):
+            return self.return_failure('Invalid api_key', do_log=False)
+
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+        
+        if symbol in user.watches:
+            self._cur_db.broker_remove_watch(user.id, symbol)
+        else:
+            return self.return_failure('No matching watch to remove', do_log=False)
+        
+        user = self._get_user(user_id)
+
+        return {
+            self.STATUS_KEY: self.STATUS_SUCCESS,
+            'user': self._get_full_user_dict(user)
         }
