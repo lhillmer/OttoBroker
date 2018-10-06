@@ -60,12 +60,13 @@ RETURNS INTEGER AS $BODY$
             update ottobroker.users set balance = user_balance - total_cost where id = _user_id;
             select id into txtype_id from ottobroker.faketransactiontypes where txtype = 'BUY';
             select id into stocktype_id from ottobroker.fakestocktypes where stocktype = 'LONG';
+            
             insert into ottobroker.faketransactions (txtypeid, userid, dollaramount, stockamount, ticker, executed, apiuserid)
             values (txtype_id, _user_id, total_cost, _quantity, _ticker, _now, api_user_id) returning id into transaction_id;
-            for i in 1.._quantity LOOP
-            	insert into ottobroker.fakestocks (stocktypeid, userid, txid, ticker, purchase_cost, purchased)
-                values (stocktype_id, _user_id, transaction_id, _ticker, _per_cost, _now);
-            end loop;
+
+            insert into ottobroker.fakestocks (stocktypeid, userid, txid, ticker, purchase_cost, purchased)
+            select stocktype_id, _user_id, transaction_id, _ticker, _per_cost, _now
+            from generate_series(1, _quantity);
         end if;
         return transaction_id;
     END;
@@ -80,12 +81,11 @@ RETURNS INTEGER AS $BODY$
         stock_count int = -1;
         transaction_id int = -1;
         txtype_id int = null;
-        stocktype_id int = -1;
-        stock_id int = 0;
+        stocktype_id int = (select id from ottobroker.fakestocktypes where stocktype = 'LONG');
         _now timestamp = now();
         api_user_id int = null;
+        update_ids int[] := ARRAY(select id from ottobroker.fakestocks where userid = _user_id and sold is null and ticker = _ticker and stocktypeid = stocktype_id order by purchased asc limit _quantity);
     BEGIN
-        select id into stocktype_id from ottobroker.fakestocktypes where stocktype = 'LONG';
         select count(id) into stock_count from ottobroker.fakestocks where userid = _user_id AND ticker = _ticker AND sold is Null AND stocktypeid = stocktype_id;
         select id into api_user_id from ottobroker.apiusers where apikey = _api_key;
         if stock_count >= _quantity AND FOUND THEN
@@ -93,12 +93,12 @@ RETURNS INTEGER AS $BODY$
             select balance into user_balance from ottobroker.users where id = _user_id;
             update ottobroker.users set balance = user_balance + total_value where id = _user_id;
             select id into txtype_id from ottobroker.faketransactiontypes where txtype = 'SELL';
+
             insert into ottobroker.faketransactions (txtypeid, userid, dollaramount, stockamount, ticker, executed, apiuserid)
             values (txtype_id, _user_id, total_value, _quantity, _ticker, _now, api_user_id) returning id into transaction_id;
-            for i in 1.._quantity LOOP
-                select id into stock_id from ottobroker.fakestocks where userid = _user_id and sold is null and ticker = _ticker and stocktypeid = stocktype_id order by purchased asc limit 1;
-            	update ottobroker.fakestocks set sold = _now, sell_cost = _per_value where id = stock_id;
-            end loop;
+
+            update ottobroker.fakestocks set sold = _now, sell_cost = _per_value
+            where id = ANY(update_ids);
         end if;
         return transaction_id;
     END;
@@ -114,12 +114,11 @@ RETURNS INTEGER AS $BODY$
         stock_index int = -1;
         transaction_id int = null;
         txtype_id int = -1;
-        stocktype_id int = -1;
-        stock_id int = 0;
+        stocktype_id int = (select id from ottobroker.fakestocktypes where stocktype = 'SHORT');
         _now timestamp = now();
         api_user_id int = null;
+        update_ids int[] = ARRAY(select id from ottobroker.fakestocks where userid = _user_id and purchased is null and ticker = _ticker and stocktypeid = stocktype_id order by sold asc limit _quantity);
     BEGIN
-        select id into stocktype_id from ottobroker.fakestocktypes where stocktype = 'SHORT';
         select count(id) into stock_count from ottobroker.fakestocks where userid = _user_id AND ticker = _ticker AND purchased is Null AND stocktypeid = stocktype_id;
         select balance into user_balance from ottobroker.users where id = _user_id;
         total_cost := _quantity * _per_cost;
@@ -127,12 +126,12 @@ RETURNS INTEGER AS $BODY$
         if user_balance >= total_cost AND stock_count >= _quantity AND FOUND THEN
             update ottobroker.users set balance = user_balance - total_cost where id = _user_id;
             select id into txtype_id from ottobroker.faketransactiontypes where txtype = 'BUY';
+
             insert into ottobroker.faketransactions (txtypeid, userid, dollaramount, stockamount, ticker, executed, apiuserid)
             values (txtype_id, _user_id, total_cost, _quantity, _ticker, _now, api_user_id) returning id into transaction_id;
-            for i in 1.._quantity LOOP
-                select id into stock_id from ottobroker.fakestocks where userid = _user_id and purchased is null and ticker = _ticker and stocktypeid = stocktype_id order by sold asc limit 1;
-            	update ottobroker.fakestocks set purchased = _now, purchase_cost = _per_cost where id = stock_id;
-            end loop;
+
+            update ottobroker.fakestocks set purchased = _now, purchase_cost = _per_cost
+            where id = ANY(update_ids);
         end if;
         return transaction_id;
     END;
@@ -157,12 +156,13 @@ RETURNS INTEGER AS $BODY$
             update ottobroker.users set balance = user_balance + total_value where id = _user_id;
             select id into txtype_id from ottobroker.faketransactiontypes where txtype = 'SELL';
             select id into stocktype_id from ottobroker.fakestocktypes where stocktype = 'SHORT';
+            
             insert into ottobroker.faketransactions (txtypeid, userid, dollaramount, stockamount, ticker, executed, apiuserid)
             values (txtype_id, _user_id, total_value, _quantity, _ticker, _now, api_user_id) returning id into transaction_id;
-            for i in 1.._quantity LOOP
-            	insert into ottobroker.fakestocks (stocktypeid, userid, txid, ticker, sell_cost, sold)
-                values (stocktype_id, _user_id, transaction_id, _ticker, _per_value, _now);
-            end loop;
+
+            insert into ottobroker.fakestocks (stocktypeid, userid, txid, ticker, sell_cost, sold)
+            select stocktype_id, _user_id, transaction_id, _ticker, _per_value, _now
+            from generate_series(1, _quantity);
         end if;
         return transaction_id;
     END;
