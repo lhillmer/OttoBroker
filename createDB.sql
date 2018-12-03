@@ -61,6 +61,22 @@ CREATE TABLE ottobroker.watches(
     PRIMARY KEY(id),
     FOREIGN KEY(userid) REFERENCES ottobroker.users(id)
 );
+CREATE TABLE ottobroker.limitorders(
+    id serial NOT NULL,
+    userid varchar(256) NOT NULL,
+    stocktypeid int NOT NULL,
+    txtypeid int NOT NULL,
+    ticker varchar(10) NOT NULL,
+    target_price NUMBER(100, 2) NOT NULL,
+    quantity int NOT NULL,
+    expiration TIMESTAMP,
+    active BOOL NOT NULL,
+    filled BOOL NOT NULL,
+
+    PRIMARY KEY(id),
+    FOREIGN KEY(stocktypeid) REFERENCES ottobroker.fakestocktypes(id),
+    FOREIGN KEY(userid) REFERENCES ottobroker.users(id)
+);
 
 INSERT INTO ottobroker.faketransactiontypes (txtype) values ('BUY'), ('SELL'), ('CAPITAL');
 INSERT INTO ottobroker.fakestocktypes (stocktype) values ('LONG'), ('SHORT');

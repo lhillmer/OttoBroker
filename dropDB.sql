@@ -4,6 +4,7 @@ DROP FUNCTION ottobroker.buylong;
 DROP FUNCTION ottobroker.selllong;
 DROP FUNCTION ottobroker.buyshort;
 DROP FUNCTION ottobroker.sellshort;
+DROP TABLE ottobroker.limitorders;
 DROP TABLE ottobroker.watches;
 DROP TABLE ottobroker.fakestocks;
 DROP TABLE ottobroker.fakestocktypes;

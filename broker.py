@@ -5,6 +5,7 @@ import copy
 from decimal import Decimal, ROUND_HALF_UP, ROUND_HALF_DOWN
 import signal
 import functools
+import math
 
 import pytz
 
@@ -97,13 +98,24 @@ class OttoBroker():
         
         return assets, liabilities, stock_vals
     
-    def _too_much_liability(self, user, additional_liability=None):
+    def _too_much_liability(self, user, additional_liability=None, additional_assets=None):
         user_assets, user_liabilities, _ = self._get_user_net_worth(user)
 
         if additional_liability is not None:
             user_liabilities += additional_liability
+        
+        if additional_assets is not None:
+            user_assets += additional_assets
 
         return (user_liabilities * self._max_liabilities_ratio) > user_assets
+
+    def _get_max_additional_liability(self, user):
+        user_assets, user_liabilities, _ = self._get_user_net_worth(user)
+
+        temp1 = user_assets - (user_liabilities * self._max_liabilities_ratio)
+        temp2 = self._max_liabilities_ratio - 1
+
+        return Decimal(float(temp1) / float(temp2))
 
     def _get_full_user_dict(self, user, shallow=False):
         if shallow:
@@ -198,14 +210,14 @@ class OttoBroker():
 
         return result
     
-    def buy_long(self, symbol, quantity, user_id, api_key):
+    def buy_long(self, symbol, quantity, user_id, api_key, max_quantity):
         user = self._get_user(user_id)
 
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         if not isinstance(quantity, int):
             return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
-        if quantity < 1:
+        if quantity < 1 and not max_quantity:
             return self.return_failure('Gotta buy at least 1 stock!', do_log=False)
         if not self.is_market_live():
             return self.return_failure('No trading after hours', do_log=False)
@@ -223,6 +235,10 @@ class OttoBroker():
                                                                                                       stock_val[symbol][self.MESSAGE_KEY]))
 
         per_stock_cost = stock_val[symbol][self.VALUE_KEY]
+        
+        if max_quantity:
+            quantity = math.floor(user.balance / per_stock_cost)
+
         total_cost = per_stock_cost * quantity
 
         if user.balance < total_cost:
@@ -251,14 +267,14 @@ class OttoBroker():
             'symbol': symbol
         }
     
-    def sell_long(self, symbol, quantity, user_id, api_key):
+    def sell_long(self, symbol, quantity, user_id, api_key, max_quantity):
         user = self._get_user(user_id)
 
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         if not isinstance(quantity, int):
             return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
-        if quantity < 1:
+        if quantity < 1 and not max_quantity:
             return self.return_failure('Gotta sell at least 1 stock!', do_log=False)
         if not self.is_market_live():
             return self.return_failure('No trading after hours', do_log=False)
@@ -276,12 +292,15 @@ class OttoBroker():
                                                                                                       stock_val[symbol][self.MESSAGE_KEY]))
 
         per_stock_cost = stock_val[symbol][self.VALUE_KEY]
-        total_cost = per_stock_cost * quantity
 
         cur_stocks = 0
         if symbol in user.longs:
             for stock in user.longs[symbol]:
                 cur_stocks += stock.count
+        
+        if max_quantity:
+            quantity = cur_stocks
+        total_cost = per_stock_cost * quantity
 
         if cur_stocks < quantity:
             extra_vals = {
@@ -304,14 +323,14 @@ class OttoBroker():
             'symbol': symbol
         }
     
-    def buy_short(self, symbol, quantity, user_id, api_key):
+    def buy_short(self, symbol, quantity, user_id, api_key, max_quantity):
         user = self._get_user(user_id)
 
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         if not isinstance(quantity, int):
             return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
-        if quantity < 1:
+        if quantity < 1 and not max_quantity:
             return self.return_failure('Gotta buy at least 1 stock!', do_log=False)
         if not self.is_market_live():
             return self.return_failure('No trading after hours', do_log=False)
@@ -329,6 +348,16 @@ class OttoBroker():
                                                                                                       stock_val[symbol][self.MESSAGE_KEY]))
 
         per_stock_cost = stock_val[symbol][self.VALUE_KEY]
+        
+        cur_stocks = 0
+        if symbol in user.shorts:
+            for stock in user.shorts[symbol]:
+                cur_stocks += stock.count
+
+        if max_quantity:
+            quantity = math.floor(user.balance / per_stock_cost)
+            quantity = min(quantity, cur_stocks)
+
         total_cost = per_stock_cost * quantity
 
         if user.balance < total_cost:
@@ -340,11 +369,6 @@ class OttoBroker():
                 'user': self._get_full_user_dict(user)
             }
             return self.return_failure('Insufficient funds', extra_vals=extra_vals, do_log=False)
-        
-        cur_stocks = 0
-        if symbol in user.shorts:
-            for stock in user.shorts[symbol]:
-                cur_stocks += stock.count
 
         if cur_stocks < quantity:
             extra_vals = {
@@ -367,14 +391,14 @@ class OttoBroker():
             'symbol': symbol
         }
     
-    def sell_short(self, symbol, quantity, user_id, api_key):
+    def sell_short(self, symbol, quantity, user_id, api_key, max_quantity):
         user = self._get_user(user_id)
 
         if not user:
             return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
         if not isinstance(quantity, int):
             return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
-        if quantity < 1:
+        if quantity < 1 and not max_quantity:
             return self.return_failure('Gotta sell at least 1 stock!', do_log=False)
         if not self.is_market_live():
             return self.return_failure('No trading after hours', do_log=False)
@@ -392,10 +416,18 @@ class OttoBroker():
                                                                                                       stock_val[symbol][self.MESSAGE_KEY]))
 
         per_stock_cost = stock_val[symbol][self.VALUE_KEY]
+
+        if max_quantity:
+            extra = self._get_max_additional_liability(user)
+            quantity = math.floor(extra / per_stock_cost)
+            _logger.warn("extra: {}, final quant: {}".format(extra, quantity))
+            if quantity < 1:
+                return self.return_failure('Not enough resources to short even once!')
+                
         total_cost = per_stock_cost * quantity
         
-        if self._too_much_liability(user, additional_liability=total_cost):
-            return self.return_failure('Your liabilities are too large. Buy back shorts to be allowed to acquire other shorts', do_log=False)
+        if self._too_much_liability(user, additional_liability=total_cost, additional_assets=total_cost):
+            return self.return_failure('Liabilities are too large. Buy back shorts to be allowed to acquire other shorts', do_log=False)
         
         if self._cur_db.broker_sell_short(user.id, symbol, per_stock_cost, quantity, api_key) is None:
             return self.return_failure('selling short failed. Ensure you have a valid API key')

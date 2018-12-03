@@ -153,3 +153,22 @@ class PostgresWrapper():
     
     def broker_remove_watch(self, user_id, symbol):
         self._query_wrapper("DELETE FROM ottobroker.watches WHERE userid=%s and ticker=%s;", [user_id, symbol], doFetch=False)
+    
+    def broker_set_limit_order(self, user_id, stocktypeid, symbol, target_price, quantity, expiration):
+        self._query_wrapper("INSERT INTO ottobroker.limitorders (userid, stocktypeid, ticker, target_price, quantity, expiration) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
+            [user_id, stocktypeid, symbol, target_price, quantity, expiration]
+        )[0][0]
+    
+    def broker_get_active_limit_orders(self, user_id):
+        rawVals = self._query_wrapper("SELECT * from ottobroker.limitorders WHERE userid=%s and active='yes';", [user_id])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerWatch(raw))
+        return result
+    
+    def broker_get_recent_inactive_limit_orders(self, user_id, expiration):
+        rawVals = self._query_wrapper("SELECT * from ottobroker.limitorders WHERE userid=%s and active='no' and expiration > %s;", [user_id, expiration])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerWatch(raw))
+        return result

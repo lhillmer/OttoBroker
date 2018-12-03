@@ -100,3 +100,28 @@ class BrokerWatch():
             'symbol': self.ticker_symbol,
             'watch_cost': self.watch_cost
         }
+
+class BrokerLimitOrder():
+    def __init__(self, raw):
+        self.id = raw[0]
+        self.user_id = raw[1]
+        self.stock_type = raw[2]
+        self.transaction_type = raw[3]
+        self.ticker_symbol = raw[4]
+        self.target_price = raw[5]
+        self.quantity = raw[6]
+        self.expiration = raw[7]
+        self.active = raw[8]
+        self.filled = raw[9]
+
+    def to_dict(self):
+        return {
+            'symbol': self.ticker_symbol,
+            'type': self.stock_type,
+            'transaction_type': self.transaction_type,
+            'target_price': self.target_price,
+            'quantity': self.quantity,
+            'expiration': self.expiration,
+            'active': self.active,
+            'filled': self.filled
+        }
