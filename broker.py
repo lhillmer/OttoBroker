@@ -24,6 +24,9 @@ class OttoBroker():
     STATUS_SUCCESS = 'success'
     STATUS_ERROR = 'error'
 
+    LONG_STOCK_TYPE = 'LONG'
+    SHORT_STOCK_TYPE = 'SHORT'
+
     def __init__(self, db_connection_string, test_connection_string, max_liabilities_ratio):
         self._rest = RestWrapper("https://api.iextrading.com/1.0", {})
 
@@ -32,6 +35,7 @@ class OttoBroker():
 
         self._test_mode = False
         self._cur_db = self._db
+        self._stock_types = None
 
         self._max_liabilities_ratio = max_liabilities_ratio
 
@@ -65,6 +69,12 @@ class OttoBroker():
             user.watches = watch_dict
         
         return user
+    
+    def _is_valid_stocktype(self, stocktype):
+        # these are kinda hardcoded values already, so wtv
+        if stocktype == OttoBroker.LONG_STOCK_TYPE or stocktype == OttoBroker.SHORT_STOCK_TYPE:
+            return True
+        return False
     
     @staticmethod
     def _convert_stock_list_to_dict(stock_list):
@@ -614,3 +624,36 @@ class OttoBroker():
             self.STATUS_KEY: self.STATUS_SUCCESS,
             'user': self._get_full_user_dict(user)
         }
+
+    def create_limit_order(self, user_id, stocktype, isbuy, symbol, target_price, quantity, max_quantity, duration_days, api_key):
+        if not self._is_valid_api_user(api_key):
+            return self.return_failure('Invalid api_key', do_log=False)
+
+        user = self._get_user(user_id)
+
+        if not user:
+            return self.return_failure('Invalid user_id: {}'.format(user_id), do_log=False)
+        if not isinstance(quantity, int):
+            return self.return_failure('Quantity, \'{}\' must be an int'.format(quantity), do_log=False)
+        if quantity < 1 and not max_quantity:
+            return self.return_failure('Gotta queue up at least 1 stock!', do_log=False)
+
+        stock_val = self.get_stock_value([symbol])
+
+        if stock_val[self.STATUS_KEY] != self.STATUS_SUCCESS:
+            # don't need to log here, because the error is presumably also logged in get_stock_value
+            return self.return_failure('Failed getting current stock value: {}'.format(stock_val[self.MESSAGE_KEY]), do_log=False)
+        
+        stocktype = stocktype.upper()
+        if not self._is_valid_stocktype(stocktype):
+            return self.return_failure('Unknown stock type {}'.format(stocktype), do_log=False)
+        
+        if duration_days == -1:
+            expiration = None
+        else:
+            cur_date = datetime.datetime.now(pytz.timezone('EST5EDT')).date()'
+            # add days to date
+            
+        
+        self._cur_db.broker_create_limit_order(user_id, stocktype, isbuy, symbol, target_price, quantity, max_quantity, )
+

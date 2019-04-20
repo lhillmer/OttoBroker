@@ -161,9 +161,13 @@ class PostgresWrapper():
     def broker_remove_watch(self, user_id, symbol):
         self._query_wrapper("DELETE FROM ottobroker.watches WHERE userid=%s and ticker=%s;", [user_id, symbol], doFetch=False)
     
-    def broker_set_limit_order(self, user_id, stocktypeid, symbol, target_price, quantity, expiration):
-        self._query_wrapper("INSERT INTO ottobroker.limitorders (userid, stocktypeid, ticker, target_price, quantity, expiration) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;",
-            [user_id, stocktypeid, symbol, target_price, quantity, expiration]
+    def broker_create_limit_order(self, user_id, stocktype, isbuy, symbol, target_price, quantity, max_quantity, expiration):
+        self._query_wrapper("""INSERT INTO ottobroker.limitorders 
+                (userid,
+                (SELECT id FROM ottobroker.fakestocktypes WHERE stocktype=%s),
+                isbuy, ticker, targetprice, quantity, maxquant, expiration) VALUES 
+                (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;""",
+            [user_id, stocktype, isbuy, symbol, target_price, quantity, max_quantity, expiration]
         )[0][0]
     
     def broker_get_active_limit_orders(self, user_id):
@@ -172,9 +176,24 @@ class PostgresWrapper():
         for raw in rawVals:
             result.append(BrokerWatch(raw))
         return result
+
+    def broker_cancel_active_limit_order(self, user_id, isbuy, ticker, stocktypeid):
+        self._query_wrapper("UPDATE ottobroker.limitorders set active='no' WHERE userid=%s and active='yes' and isbuy=%s and ticker=%s and stocktypeid=%s",
+            [user_id, isbuy, ticker, stocktypeid], doFetch=False) 
+    
+    def broker_fill_limit_order(self, limit_order_id, expiration):
+        self._query_wrapper("UPDATE ottobroker.limitorders set active='no', filled='yes', expiration=%s WHERE id=%s",
+            [expiration, limit_order_id], doFetch=False) 
     
     def broker_get_recent_inactive_limit_orders(self, user_id, expiration):
         rawVals = self._query_wrapper("SELECT * from ottobroker.limitorders WHERE userid=%s and active='no' and expiration > %s;", [user_id, expiration])
+        result = []
+        for raw in rawVals:
+            result.append(BrokerWatch(raw))
+        return result
+    
+    def broker_get_recent_filled_limit_orders(self, user_id, expiration):
+        rawVals = self._query_wrapper("SELECT * from ottobroker.limitorders WHERE userid=%s and filled='yes' and expiration > %s;", [user_id, expiration])
         result = []
         for raw in rawVals:
             result.append(BrokerWatch(raw))
