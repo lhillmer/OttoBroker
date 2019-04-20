@@ -54,6 +54,13 @@ class PostgresWrapper():
             return BrokerUser(result[0])
         else:
             return None
+
+    def broker_get_single_user_by_name(self, user_id):
+        result = self._query_wrapper("SELECT * FROM ottobroker.users WHERE displayname=%s;", [user_id])
+        if len(result) > 0:
+            return BrokerUser(result[0])
+        else:
+            return None
     
     def broker_get_all_user_ids(self):
         rawVals = self._query_wrapper("SELECT id FROM ottobroker.users;", [])
